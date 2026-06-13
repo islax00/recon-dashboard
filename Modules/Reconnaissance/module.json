@@ -1,0 +1,11 @@
+{
+    "name": "Reconnaissance",
+    "alias": "reconnaissance",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Reconnaissance\\Providers\\ReconnaissanceServiceProvider"
+    ],
+    "files": []
+}

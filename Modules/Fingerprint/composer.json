@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/fingerprint",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Fingerprint\\": "app/",
+            "Modules\\Fingerprint\\Database\\Factories\\": "database/factories/",
+            "Modules\\Fingerprint\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Fingerprint\\Tests\\": "tests/"
+        }
+    }
+}

@@ -1,0 +1,12 @@
+{
+    "Core": true,
+    "Reconnaissance": true,
+    "Subdomain": true,
+    "Crawler": true,
+    "JsAnalyzer": true,
+    "Fingerprint": true,
+    "Network": true,
+    "Report": true,
+    "Graph": true,
+    "Intelligence": true
+}

@@ -17,8 +17,10 @@ services:
             XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
             XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
+            RECON_TOOLS_HOST: 'recon-tools'
         volumes:
             - '.:/var/www/html'
+            - './storage/recon:/recon-output'
         networks:
             - sail
         depends_on:
@@ -27,6 +29,19 @@ services:
             - mailpit
             - selenium
             - meilisearch
+            - recon-tools
+    recon-tools:
+        build:
+            context: './docker/recon'
+            dockerfile: Dockerfile
+        volumes:
+            - './storage/recon:/output'
+            - './docker/recon/config:/root/.config/projectdiscovery'
+        networks:
+            - sail
+        stdin_open: true
+        tty: true
+        restart: unless-stopped
     mysql:
         image: 'mysql:8.4'
         ports:

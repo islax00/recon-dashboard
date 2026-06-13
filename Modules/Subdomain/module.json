@@ -1,0 +1,11 @@
+{
+    "name": "Subdomain",
+    "alias": "subdomain",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Subdomain\\Providers\\SubdomainServiceProvider"
+    ],
+    "files": []
+}

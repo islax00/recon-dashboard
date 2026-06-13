@@ -1,0 +1,11 @@
+{
+    "name": "Fingerprint",
+    "alias": "fingerprint",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Fingerprint\\Providers\\FingerprintServiceProvider"
+    ],
+    "files": []
+}

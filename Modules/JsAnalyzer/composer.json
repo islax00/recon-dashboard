@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/jsanalyzer",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\JsAnalyzer\\": "app/",
+            "Modules\\JsAnalyzer\\Database\\Factories\\": "database/factories/",
+            "Modules\\JsAnalyzer\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\JsAnalyzer\\Tests\\": "tests/"
+        }
+    }
+}

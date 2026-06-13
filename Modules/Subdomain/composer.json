@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/subdomain",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Subdomain\\": "app/",
+            "Modules\\Subdomain\\Database\\Factories\\": "database/factories/",
+            "Modules\\Subdomain\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Subdomain\\Tests\\": "tests/"
+        }
+    }
+}

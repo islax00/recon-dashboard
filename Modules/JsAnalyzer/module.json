@@ -1,0 +1,11 @@
+{
+    "name": "JsAnalyzer",
+    "alias": "jsanalyzer",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\JsAnalyzer\\Providers\\JsAnalyzerServiceProvider"
+    ],
+    "files": []
+}

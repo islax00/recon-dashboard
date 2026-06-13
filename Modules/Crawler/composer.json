@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/crawler",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Crawler\\": "app/",
+            "Modules\\Crawler\\Database\\Factories\\": "database/factories/",
+            "Modules\\Crawler\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Crawler\\Tests\\": "tests/"
+        }
+    }
+}
