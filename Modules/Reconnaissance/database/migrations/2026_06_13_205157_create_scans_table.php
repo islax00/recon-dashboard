@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('scans', function (Blueprint $table) {
             $table->id();
-            
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('domain');
+            $table->enum('status', ['pending', 'running', 'completed', 'failed'])->default('pending');
+            $table->json('options')->nullable();     
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
         });
     }
