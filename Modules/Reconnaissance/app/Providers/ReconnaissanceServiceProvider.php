@@ -2,8 +2,11 @@
 
 namespace Modules\Reconnaissance\Providers;
 
-use Nwidart\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Gate;
+use Modules\Reconnaissance\Models\Scan;
+use Modules\Reconnaissance\Policies\ScanPolicy;
+use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class ReconnaissanceServiceProvider extends ModuleServiceProvider
 {
@@ -11,6 +14,13 @@ class ReconnaissanceServiceProvider extends ModuleServiceProvider
      * The name of the module.
      */
     protected string $name = 'Reconnaissance';
+
+    public function boot(): void
+    {
+        parent::boot();
+
+        Gate::policy(Scan::class, ScanPolicy::class);
+    }
 
     /**
      * The lowercase version of the module name.
@@ -36,8 +46,8 @@ class ReconnaissanceServiceProvider extends ModuleServiceProvider
 
     /**
      * Define module schedules.
-     * 
-     * @param $schedule
+     *
+     * @param  $schedule
      */
     // protected function configureSchedules(Schedule $schedule): void
     // {

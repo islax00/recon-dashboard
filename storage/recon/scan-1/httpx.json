@@ -1,0 +1,2 @@
+{"url":"https:\/\/example.com","input":"example.com","status_code":200,"title":"Example","tech":[{"name":"Nginx","version":"1.24","category":"server"}]}
+{"url":"https:\/\/api.example.com","input":"api.example.com","status_code":200,"title":"API","tech":[{"name":"Laravel","version":"13","category":"framework"}]}

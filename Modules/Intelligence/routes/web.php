@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Intelligence\Http\Controllers\IntelligenceController;
+use Modules\Intelligence\Http\Controllers\ChatController;
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::resource('intelligences', IntelligenceController::class)->names('intelligence');
+    Route::post('scans/{scan}/chat', [ChatController::class, 'store'])->name('scans.chat');
 });

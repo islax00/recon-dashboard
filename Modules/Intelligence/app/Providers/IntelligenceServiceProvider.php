@@ -2,8 +2,8 @@
 
 namespace Modules\Intelligence\Providers;
 
-use Nwidart\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
+use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class IntelligenceServiceProvider extends ModuleServiceProvider
 {
@@ -11,6 +11,13 @@ class IntelligenceServiceProvider extends ModuleServiceProvider
      * The name of the module.
      */
     protected string $name = 'Intelligence';
+
+    public function register(): void
+    {
+        parent::register();
+
+        $this->mergeConfigFrom(module_path($this->name, 'config/intelligence.php'), 'intelligence');
+    }
 
     /**
      * The lowercase version of the module name.
@@ -36,8 +43,8 @@ class IntelligenceServiceProvider extends ModuleServiceProvider
 
     /**
      * Define module schedules.
-     * 
-     * @param $schedule
+     *
+     * @param  $schedule
      */
     // protected function configureSchedules(Schedule $schedule): void
     // {
