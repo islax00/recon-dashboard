@@ -1,13 +1,22 @@
-import subprocess
-import os
-import threading
 import json
+import os
+import subprocess
+import threading
 from datetime import datetime
-from flask import Flask, request, jsonify
+
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 OUTPUT_DIR = '/output'
-ALLOWED_TOOLS = ['subfinder', 'httpx', 'katana', 'dnsx', 'nuclei', 'naabu']
+ALLOWED_TOOLS = ['subfinder', 'httpx', 'katana', 'nuclei', 'naabu']
+
+# Laravel Sail paths that share the same volume as OUTPUT_DIR in this container.
+LARAVEL_PATH_PREFIXES = (
+    '/var/www/html/storage/recon',
+    '/recon-output',
+)
+
+PATH_FLAG_ARGS = {'-o', '-l', '-list', '-u', '-d'}
 
 
 def ensure_scan_dir(scan_id: str) -> str:
@@ -16,10 +25,65 @@ def ensure_scan_dir(scan_id: str) -> str:
     return path
 
 
-def write_status(scan_dir: str, tool: str, status: str, extra: dict = {}):
+def rewrite_path(path: str) -> str:
+    normalized = path.replace('\\', '/')
+
+    for prefix in LARAVEL_PATH_PREFIXES:
+        if normalized.startswith(prefix):
+            relative = normalized[len(prefix):].lstrip('/')
+            return os.path.join(OUTPUT_DIR, relative)
+
+    return path
+
+
+def normalize_args(tool: str, args: list, scan_dir: str) -> tuple[list, str]:
+    rewritten = []
+    output_file = None
+    index = 0
+
+    while index < len(args):
+        flag = args[index]
+
+        if flag in PATH_FLAG_ARGS and index + 1 < len(args):
+            value = rewrite_path(args[index + 1])
+
+            if flag == '-o':
+                output_file = value
+
+            rewritten.extend([flag, value])
+            index += 2
+            continue
+
+        rewritten.append(flag)
+        index += 1
+
+    if output_file is None:
+        output_file = os.path.join(scan_dir, f'{tool}.txt')
+        rewritten.extend(['-o', output_file])
+
+    return rewritten, output_file
+
+
+def write_status(scan_dir: str, tool: str, status: str, extra=None):
+    if extra is None:
+        extra = {}
+
     status_file = os.path.join(scan_dir, f'{tool}.status.json')
-    with open(status_file, 'w') as f:
-        json.dump({'status': status, 'updated_at': datetime.utcnow().isoformat(), **extra}, f)
+
+    with open(status_file, 'w', encoding='utf-8') as handle:
+        json.dump(
+            {
+                'status': status,
+                'updated_at': datetime.utcnow().isoformat(),
+                **extra,
+            },
+            handle,
+        )
+
+
+def read_output_lines(output_file: str) -> list[str]:
+    with open(output_file, 'r', encoding='utf-8', errors='replace') as handle:
+        return [line.strip() for line in handle if line.strip()]
 
 
 @app.route('/health', methods=['GET'])
@@ -30,48 +94,57 @@ def health():
 @app.route('/tools', methods=['GET'])
 def list_tools():
     available = []
+
     for tool in ALLOWED_TOOLS:
         result = subprocess.run(['which', tool], capture_output=True, text=True)
         available.append({
             'name': tool,
             'available': result.returncode == 0,
         })
+
     return jsonify({'tools': available})
 
 
 @app.route('/run', methods=['POST'])
 def run_tool():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     tool = data.get('tool')
     args = data.get('args', [])
     scan_id = str(data.get('scan_id', ''))
 
     if not tool or tool not in ALLOWED_TOOLS:
-        return jsonify({'error': f'Tool not allowed'}), 400
+        return jsonify({'error': 'Tool not allowed'}), 400
+
     if not scan_id:
         return jsonify({'error': 'scan_id is required'}), 400
 
     scan_dir = ensure_scan_dir(scan_id)
-    output_file = os.path.join(scan_dir, f'{tool}.txt')
+    normalized_args, output_file = normalize_args(tool, args, scan_dir)
 
-    write_status(scan_dir, tool, 'running')
+    write_status(scan_dir, tool, 'running', {'output_file': output_file})
 
     def run():
         try:
             result = subprocess.run(
-                [tool] + args + ['-o', output_file],
+                [tool, *normalized_args],
                 capture_output=True,
                 text=True,
-                timeout=7200  # ساعتين max
+                timeout=7200,
             )
-            write_status(scan_dir, tool, 'completed', {
+            status = 'completed' if result.returncode == 0 else 'failed'
+
+            write_status(scan_dir, tool, status, {
                 'exit_code': result.returncode,
-                'stderr': result.stderr[-500:] if result.stderr else '',
+                'output_file': output_file,
+                'stderr': result.stderr[-1000:] if result.stderr else '',
             })
         except subprocess.TimeoutExpired:
-            write_status(scan_dir, tool, 'timeout')
-        except Exception as e:
-            write_status(scan_dir, tool, 'failed', {'error': str(e)})
+            write_status(scan_dir, tool, 'timeout', {'output_file': output_file})
+        except Exception as error:
+            write_status(scan_dir, tool, 'failed', {
+                'output_file': output_file,
+                'error': str(error),
+            })
 
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
@@ -91,19 +164,34 @@ def get_status(scan_id: str, tool: str):
     if not os.path.exists(status_file):
         return jsonify({'status': 'not_started'}), 404
 
-    with open(status_file, 'r') as f:
-        return jsonify(json.load(f))
+    with open(status_file, 'r', encoding='utf-8') as handle:
+        return jsonify(json.load(handle))
 
 
 @app.route('/output/<scan_id>/<tool>', methods=['GET'])
 def get_output(scan_id: str, tool: str):
-    output_file = os.path.join(OUTPUT_DIR, f'scan-{scan_id}', f'{tool}.txt')
+    scan_dir = os.path.join(OUTPUT_DIR, f'scan-{scan_id}')
+    status_file = os.path.join(scan_dir, f'{tool}.status.json')
+    output_file = os.path.join(scan_dir, f'{tool}.txt')
+    status_data = {}
+
+    if os.path.exists(status_file):
+        with open(status_file, 'r', encoding='utf-8') as handle:
+            status_data = json.load(handle)
+
+        output_file = status_data.get('output_file', output_file)
+
+        if status_data.get('status') in {'failed', 'timeout'}:
+            return jsonify({
+                'ready': False,
+                'error': status_data.get('stderr') or status_data.get('error') or 'Tool failed',
+                'exit_code': status_data.get('exit_code'),
+            })
 
     if not os.path.exists(output_file):
-        return jsonify({'ready': False}), 404
+        return jsonify({'ready': False, 'error': 'Output file not found'}), 404
 
-    with open(output_file, 'r') as f:
-        lines = [l.strip() for l in f if l.strip()]
+    lines = read_output_lines(output_file)
 
     return jsonify({'ready': True, 'count': len(lines), 'results': lines})
 

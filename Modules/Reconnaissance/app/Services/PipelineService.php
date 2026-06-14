@@ -8,7 +8,6 @@ use Modules\Crawler\Jobs\RunKatanaJob;
 use Modules\Fingerprint\Jobs\RunHttpxJob;
 use Modules\Graph\Jobs\BuildGraphJob;
 use Modules\JsAnalyzer\Jobs\AnalyzeJsFilesJob;
-use Modules\Network\Jobs\RunDnsxJob;
 use Modules\Reconnaissance\Jobs\RunScanPipelineJob;
 use Modules\Reconnaissance\Models\Scan;
 use Modules\Report\Jobs\GenerateReportJob;
@@ -20,16 +19,15 @@ class PipelineService
     use InteractsWithScanPipeline;
 
     /**
-     * @var array<int, array{job: class-string, stage: string, progress: int}>
+     * @var array<int, array{job: class-string, stage: string, progress: int, message: string}>
      */
     protected array $stages = [
-        ['job' => RunSubfinderJob::class, 'stage' => 'subfinder', 'progress' => 15],
-        // ['job' => RunDnsxJob::class, 'stage' => 'dnsx', 'progress' => 30],
-        ['job' => RunKatanaJob::class, 'stage' => 'katana', 'progress' => 45],
-        ['job' => AnalyzeJsFilesJob::class, 'stage' => 'js_analyzer', 'progress' => 60],
-        ['job' => RunHttpxJob::class, 'stage' => 'httpx', 'progress' => 75],
-        ['job' => GenerateReportJob::class, 'stage' => 'report', 'progress' => 90],
-        ['job' => BuildGraphJob::class, 'stage' => 'graph', 'progress' => 100],
+        ['job' => RunSubfinderJob::class, 'stage' => 'subfinder', 'progress' => 15, 'message' => 'Discovering subdomains'],
+        ['job' => RunHttpxJob::class, 'stage' => 'httpx', 'progress' => 40, 'message' => 'Fingerprinting live hosts'],
+        ['job' => RunKatanaJob::class, 'stage' => 'katana', 'progress' => 60, 'message' => 'Crawling alive hosts for endpoints'],
+        ['job' => AnalyzeJsFilesJob::class, 'stage' => 'js_analyzer', 'progress' => 75, 'message' => 'Analyzing JavaScript files'],
+        ['job' => GenerateReportJob::class, 'stage' => 'report', 'progress' => 90, 'message' => 'Generating risk report'],
+        ['job' => BuildGraphJob::class, 'stage' => 'graph', 'progress' => 100, 'message' => 'Building attack surface graph'],
     ];
 
     public function dispatch(Scan $scan): void
@@ -48,8 +46,21 @@ class PipelineService
 
         try {
             foreach ($this->stages as $stage) {
+                $this->broadcastProgress(
+                    $scan->fresh(),
+                    $stage['stage'],
+                    max(0, $stage['progress'] - 5),
+                    $stage['message'],
+                );
+
                 dispatch_sync(new $stage['job']($scan));
-                $this->broadcastProgress($scan->fresh(), $stage['stage'], $stage['progress']);
+
+                $this->broadcastProgress(
+                    $scan->fresh(),
+                    $stage['stage'],
+                    $stage['progress'],
+                    $stage['stage'].' completed',
+                );
             }
 
             $scan->update([

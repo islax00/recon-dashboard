@@ -67,7 +67,12 @@ class FakeReconCommandRunner implements ReconCommandRunnerInterface
      */
     protected function katanaOutput(array $command): string
     {
+        $listFile = $this->optionValue($command, '-list');
         $target = $this->optionValue($command, '-u') ?? 'https://example.com';
+
+        if ($listFile !== null && is_file($listFile)) {
+            $target = trim((string) file($listFile)[0]) ?: $target;
+        }
 
         return implode(PHP_EOL, [
             $target,

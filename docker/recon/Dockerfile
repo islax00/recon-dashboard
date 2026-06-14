@@ -17,5 +17,6 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install flask
 
 COPY --from=builder /go/bin/* /usr/local/bin/
+COPY api.py /app/api.py
 
 CMD ["python3", "/app/api.py"]

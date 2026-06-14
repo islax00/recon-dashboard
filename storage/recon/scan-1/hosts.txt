@@ -1,2 +1,0 @@
-api.example.com
-example.com

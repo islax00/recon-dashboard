@@ -27,12 +27,44 @@ class KatanaService implements ReconToolInterface
     {
         $outputDirectory = ReconCommandRunner::scanOutputDirectory($scan->id);
         $outputFile = $outputDirectory.DIRECTORY_SEPARATOR.'endpoints.txt';
-        $target = 'https://'.$scan->domain;
+        $targetsFile = $outputDirectory.DIRECTORY_SEPARATOR.'katana-targets.txt';
+        $maxTargets = (int) config('recon.katana_max_targets', 25);
+
+        $hostnames = Subdomain::query()
+            ->where('scan_id', $scan->id)
+            ->where('is_alive', true)
+            ->orderBy('id')
+            ->limit($maxTargets)
+            ->pluck('hostname')
+            ->all();
+
+        if ($hostnames === []) {
+            $hostnames = Subdomain::query()
+                ->where('scan_id', $scan->id)
+                ->orderBy('id')
+                ->limit($maxTargets)
+                ->pluck('hostname')
+                ->all();
+        }
+
+        if ($hostnames === []) {
+            $hostnames = [$scan->domain];
+        }
+
+        $targets = array_map(function (string $hostname): string {
+            $normalized = preg_replace('#^https?://#', '', strtolower(trim($hostname))) ?? trim($hostname);
+
+            return 'https://'.$normalized;
+        }, $hostnames);
+
+        file_put_contents($targetsFile, implode(PHP_EOL, array_unique($targets)));
 
         $result = $this->runner->run([
             (string) config('recon.tools.katana', 'katana'),
-            '-u', $target,
+            '-list', $targetsFile,
             '-silent',
+            '-jc',
+            '-d', (string) config('recon.katana_depth', 2),
             '-o', $outputFile,
         ]);
 
@@ -40,17 +72,19 @@ class KatanaService implements ReconToolInterface
         $items = $this->parser->parse($output);
 
         if ($items === [] && ! $result->successful) {
-            $items = [['url' => $target, 'method' => 'GET']];
+            $items = [['url' => 'https://'.$scan->domain, 'method' => 'GET']];
         }
-
-        $subdomain = Subdomain::query()
-            ->where('scan_id', $scan->id)
-            ->where('hostname', $scan->domain)
-            ->first();
 
         $stored = [];
 
         foreach ($items as $item) {
+            $hostname = parse_url($item['url'], PHP_URL_HOST) ?: $scan->domain;
+
+            $subdomain = Subdomain::query()
+                ->where('scan_id', $scan->id)
+                ->where('hostname', $hostname)
+                ->first();
+
             $endpoint = Endpoint::query()->updateOrCreate(
                 [
                     'scan_id' => $scan->id,
@@ -72,7 +106,7 @@ class KatanaService implements ReconToolInterface
             tool: $this->name(),
             success: true,
             items: $stored,
-            metadata: ['count' => count($stored)],
+            metadata: ['count' => count($stored), 'targets' => count($targets)],
         );
     }
 }

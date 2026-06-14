@@ -21,28 +21,31 @@ class ReconCommandRunner implements ReconCommandRunnerInterface
      */
     public function run(array $command, ?string $workingDirectory = null): ReconCommandResult
     {
-        $tool   = $command[0];
-        $args   = array_slice($command, 1);
-        $scanId = $this->extractScanId($workingDirectory);
+        $tool = basename($command[0]);
+        $args = array_slice($command, 1);
+        $scanId = $this->extractScanId($workingDirectory, $command);
 
         Http::timeout(30)->post("{$this->baseUrl}/run", [
-            'tool'    => $tool,
-            'args'    => $args,
+            'tool' => $tool,
+            'args' => $args,
             'scan_id' => $scanId,
         ]);
 
-        $this->waitForCompletion($tool, $scanId);
+        $statusData = $this->waitForCompletion($tool, $scanId);
 
         $response = Http::timeout(30)->get("{$this->baseUrl}/output/{$scanId}/{$tool}");
-        $data     = $response->json();
+        $data = $response->json() ?? [];
 
-        $ready = $data['ready'] ?? false;
+        $exitCode = (int) ($statusData['exit_code'] ?? 1);
+        $toolStatus = (string) ($statusData['status'] ?? 'unknown');
+        $hasOutput = ($data['ready'] ?? false) === true;
+        $successful = $hasOutput && $toolStatus === 'completed' && $exitCode === 0;
 
         return new ReconCommandResult(
-            successful: $ready,
-            output: $ready ? implode("\n", $data['results'] ?? []) : '',
-            errorOutput: $ready ? '' : ($data['error'] ?? 'Tool failed or timed out'),
-            exitCode: $ready ? 0 : 1,
+            successful: $successful,
+            output: $hasOutput ? implode("\n", $data['results'] ?? []) : '',
+            errorOutput: $successful ? '' : ($data['error'] ?? $statusData['stderr'] ?? $statusData['error'] ?? 'Tool failed or timed out'),
+            exitCode: $successful ? 0 : ($exitCode ?: 1),
         );
     }
 
@@ -56,34 +59,49 @@ class ReconCommandRunner implements ReconCommandRunnerInterface
         return $path;
     }
 
-    private function waitForCompletion(string $tool, string $scanId): void
+    /**
+     * @return array<string, mixed>
+     */
+    private function waitForCompletion(string $tool, string $scanId): array
     {
         $maxWait = (int) config('recon.command_timeout', 7200);
-        $waited  = 0;
+        $pollInterval = max(1, (int) config('recon.poll_interval', 2));
+        $waited = 0;
 
         while ($waited < $maxWait) {
-            sleep(15);
-            $waited += 15;
-
             try {
                 $response = Http::timeout(10)->get("{$this->baseUrl}/status/{$scanId}/{$tool}");
-                $status   = $response->json('status');
+                $statusData = $response->json() ?? [];
+                $status = $statusData['status'] ?? null;
 
-                if (in_array($status, ['completed', 'failed', 'timeout'])) {
-                    return;
+                if (in_array($status, ['completed', 'failed', 'timeout'], true)) {
+                    return $statusData;
                 }
             } catch (\Exception) {
-  
             }
+
+            sleep($pollInterval);
+            $waited += $pollInterval;
         }
+
+        return ['status' => 'timeout'];
     }
 
-    private function extractScanId(?string $workingDirectory): string
+    /**
+     * @param  array<int, string>  $command
+     */
+    private function extractScanId(?string $workingDirectory, array $command): string
     {
-        if ($workingDirectory && preg_match('/scan-(\d+)/', $workingDirectory, $matches)) {
+        if ($workingDirectory !== null && preg_match('/scan-(\d+)/', $workingDirectory, $matches)) {
             return $matches[1];
         }
 
-        return (string) time();
+        foreach ($command as $argument) {
+            if (preg_match('/scan-(\d+)/', (string) $argument, $matches)) {
+                return $matches[1];
+            }
+        }
+
+        throw new \RuntimeException('Unable to determine scan id from recon command.');
     }
 }
