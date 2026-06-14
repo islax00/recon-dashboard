@@ -24,7 +24,7 @@ class PipelineService
      */
     protected array $stages = [
         ['job' => RunSubfinderJob::class, 'stage' => 'subfinder', 'progress' => 15],
-        ['job' => RunDnsxJob::class, 'stage' => 'dnsx', 'progress' => 30],
+        // ['job' => RunDnsxJob::class, 'stage' => 'dnsx', 'progress' => 30],
         ['job' => RunKatanaJob::class, 'stage' => 'katana', 'progress' => 45],
         ['job' => AnalyzeJsFilesJob::class, 'stage' => 'js_analyzer', 'progress' => 60],
         ['job' => RunHttpxJob::class, 'stage' => 'httpx', 'progress' => 75],
